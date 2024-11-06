@@ -20,6 +20,7 @@ const userSchema = new mongoose.Schema({
   photo: {
     type: String,
     required: false,
+    default: 'default.jpg',
   },
   role: {
     type: String,

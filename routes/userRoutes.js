@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.post('/signup', authController.signup);
 router.post('/login', authController.login);
+router.get('/logout', authController.logout);
 
 router.post('/forgotPassword', authController.forgotPassword);
 router.patch('/resetPassword/:token', authController.resetPassword);
@@ -15,8 +16,20 @@ router.patch(
   authController.updatePassword,
 );
 
-router.patch('/updateMe', authController.protect, userController.updateMe);
-router.delete('/deleteMe', authController.protect, userController.deleteMe);
+//From here on user needs to be verified
+router.use(authController.protect);
+
+router.get('/me', userController.getMe, userController.getUser);
+router.patch(
+  '/updateMe',
+  userController.uploadUserPhoto,
+  userController.reSizeUserPhoto,
+  userController.updateMe,
+);
+router.delete('/deleteMe', userController.deleteMe);
+
+// From here on only admin can perform these functions
+router.use(authController.restrictTo('admin'));
 
 router
   .route('/')

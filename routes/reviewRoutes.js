@@ -2,23 +2,29 @@ const express = require('express');
 const reviewController = require('../controllers/reviewController');
 const authController = require('../controllers/authController');
 
-const router = express.Router();
+// Merge parameters from all routers
+const router = express.Router({ mergeParams: true });
+
+//User needs to be verified for here on
+router.use(authController.protect);
 
 router
   .route('/')
-  .get(
-    authController.protect,
+  .get(authController.restrictTo('user'), reviewController.getAllReviews)
+  .post(
     authController.restrictTo('user'),
-    reviewController.getAllReviews,
-  )
-  .post(reviewController.createReview);
+    reviewController.setTourUserIds,
+    reviewController.createReview,
+  );
 router
   .route('/:id')
   .get(reviewController.getReview)
-  .patch(reviewController.updateReview)
+  .patch(
+    authController.restrictTo('user', 'admin'),
+    reviewController.updateReview,
+  )
   .delete(
-    authController.protect,
-    authController.restrictTo('admin', 'lead-guide'),
+    authController.restrictTo('user', 'admin'),
     reviewController.deleteReview,
   );
 

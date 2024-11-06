@@ -1,31 +1,35 @@
+const multer = require('multer');
+const sharp = require('sharp');
 const Tour = require('../models/tourModel');
-const APIFeatures = require('../utils/apiFeatures');
-const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
+const factory = require('./handlerFactory');
+const AppError = require('../utils/appError');
 
+const multerStorage = multer.memoryStorage();
+
+const multerFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image')) {
+    cb(null, true);
+  } else {
+    cb(new AppError('Not an image. Please only upload images', 400), false);
+  }
+};
+
+const upload = multer({ storage: multerStorage, fileFilter: multerFilter });
+
+exports.uploadTourImages = upload.fields([
+  { name: 'imageCover', maxCount: 1 },
+  { name: 'images', maxCount: 3 },
+]);
+exports.resizeTourImages = (req, res, next) => {
+  next();
+};
 exports.topTours = async (req, res, next) => {
   req.query.limit = '5';
   req.query.sort = '-ratingsAverage,price';
   req.query.fields = 'name,priceAverage,summary,difficulty';
   next();
 };
-
-exports.getAllTours = catchAsync(async (req, res) => {
-  const features = new APIFeatures(Tour.find(), req.query)
-    .filter()
-    .sort()
-    .limitFields()
-    .paginate();
-
-  const tours = await features.query;
-
-  //SEND RESPONSE
-  res.status(200).json({
-    status: 'success',
-    results: tours.length,
-    data: { tours },
-  });
-});
 
 exports.getTourStats = catchAsync(async (req, res, next) => {
   //Using mogodb aggregation library - see mongo documentation
@@ -36,8 +40,8 @@ exports.getTourStats = catchAsync(async (req, res, next) => {
     {
       $group: {
         _id: '$difficulty',
-        numRatings: { $sum: '$ratingsQuantity' },
         numTours: { $sum: 1 },
+        numRatings: { $sum: '$ratingsQuantity' },
         avgRating: { $avg: '$ratingsAverage' },
         avgPrice: { $avg: '$price' },
         minPrice: { $min: '$price' },
@@ -97,55 +101,63 @@ exports.getMonthlyPlan = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.getTour = catchAsync(async (req, res, next) => {
-  const tour = await Tour.findById(req.params.id).populate('reviews');
+exports.getToursWithin = catchAsync(async (req, res, next) => {
+  const { distance, latlgn, unit } = req.params;
+  const [lat, lgn] = latlgn.split(',');
+  // Radus is distance / radius of Esrth (miles or km).
+  const radius = unit === 'mi' ? distance / 3963.2 : distance / 6378.1;
 
-  if (!tour) {
-    return next(new AppError('No tour found with that ID', 404));
+  if (!lat || !lgn) {
+    next(new AppError('please provide lattitide and longitude', 400));
   }
-  res.status(201).json({
-    status: 'success',
-    data: {
-      tour: tour,
-    },
-  });
-});
 
-exports.createTour = catchAsync(async (req, res, next) => {
-  const newTour = await Tour.create(req.body);
-  res.status(201).json({
-    status: 'success',
-    data: {
-      tour: newTour,
-    },
-  });
-});
-
-exports.updateTour = catchAsync(async (req, res, next) => {
-  const tour = await Tour.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
-    runValidators: true,
+  const tours = await Tour.find({
+    startLocation: { $geoWithin: { $centerSphere: [[lgn, lat], radius] } },
   });
 
-  if (!tour) {
-    return next(new AppError('No tour found with that ID', 404));
-  }
   res.status(200).json({
     status: 'success',
-    data: {
-      tour: tour,
-    },
+    results: tours.length,
+    data: { data: tours },
   });
 });
 
-exports.deleteTour = catchAsync(async (req, res, next) => {
-  const tour = await Tour.findByIdAndDelete(req.params.id, req.body);
+exports.getDistances = catchAsync(async (req, res, next) => {
+  const { latlgn, unit } = req.params;
+  const [lat, lgn] = latlgn.split(',');
 
-  if (!tour) {
-    return next(new AppError('No tour found with that ID', 404));
+  const multipiler = unit === 'mi' ? 0.000621371 : 0.0001;
+
+  if (!lat || !lgn) {
+    next(new AppError('please provide lattitide and longitude', 400));
   }
-  res.status(204).json({
+
+  const distances = await Tour.aggregate([
+    {
+      $geoNear: {
+        near: {
+          type: 'Point',
+          coordinates: [lgn * 1, lat * 1],
+        },
+        distanceField: 'distance',
+        distanceMultiplier: multipiler,
+      },
+    },
+    {
+      $project: {
+        distance: 1,
+        name: 1,
+      },
+    },
+  ]);
+  res.status(200).json({
     status: 'success',
-    data: null,
+    data: { data: distances },
   });
 });
+
+exports.getTour = factory.getOne(Tour, { path: 'reviews' });
+exports.getAllTours = factory.getAll(Tour);
+exports.createTour = factory.createOne(Tour);
+exports.updateTour = factory.updateOne(Tour);
+exports.deleteTour = factory.deleteOne(Tour);
