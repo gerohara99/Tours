@@ -16,6 +16,7 @@ const viewRouter = require('./routes/viewRoutes');
 
 const { mongo } = require('mongoose');
 
+//Start express app
 const app = express();
 
 //Serving static files
