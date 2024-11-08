@@ -8,6 +8,7 @@ const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const cookieParser = require('cookie-parser');
 const AppError = require('./utils/appError');
+const compression = require('compression');
 const globalErrorHandler = require('./controllers/errorController');
 const tourRouter = require('./routes/tourRoutes');
 const userRouter = require('./routes/userRoutes');
@@ -70,7 +71,7 @@ app.use(
     ], // Specifying parameters that are ok to be duplicated
   }),
 );
-
+app.use(compression());
 //Test middleware
 app.use((req, res, next) => {
   req.requestTime = new Date().toISOString();
