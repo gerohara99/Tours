@@ -9,6 +9,7 @@ const xss = require('xss-clean');
 const cookieParser = require('cookie-parser');
 const AppError = require('./utils/appError');
 const compression = require('compression');
+const cors = require('cors');
 const globalErrorHandler = require('./controllers/errorController');
 const tourRouter = require('./routes/tourRoutes');
 const userRouter = require('./routes/userRoutes');
@@ -24,6 +25,12 @@ app.enable('trust proxy');
 
 //Serving static files
 app.use(express.static(path.join(__dirname, 'public')));
+
+//Implement cors - Access-Control-Allow-Origin * for Get and Post for all routes
+app.use(cors());
+
+// Alloow cors for 'complex' methods such as patch, put and delete for all routes
+app.options('*', cors());
 
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
