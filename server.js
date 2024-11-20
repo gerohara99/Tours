@@ -39,3 +39,12 @@ process.on('unhandledRejection', (err) => {
     process.exit(1);
   });
 });
+
+//Handling heroku kills processes every 24 hours via SIGTERM signal
+process.on('SIGTERM', () => {
+  console.log('SIGTERM RECIEVED. Shutting down gracefully ');
+  // Close the server but complete all outstanding requests first
+  server.close(() => {
+    console.log('Process terminated');
+  });
+});

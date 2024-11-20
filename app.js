@@ -20,6 +20,8 @@ const { mongo } = require('mongoose');
 //Start express app
 const app = express();
 
+app.enable('trust proxy');
+
 //Serving static files
 app.use(express.static(path.join(__dirname, 'public')));
 
